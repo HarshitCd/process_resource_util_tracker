@@ -8,10 +8,10 @@ import json
 def get_pid(name: str) ->int:
     try:
         return int(check_output(["pidof",name]).decode("utf-8").split(" ")[-1].strip())
-    except CalledProcessError as e:
+    except CalledProcessError: 
         return -1
 
-def resource_tracker(pname:str, pid: int, samples: int = 30, interval: int = 0.5) -> dict:
+def resource_tracker(pname:str, pid: int, samples: int = 60, interval: int = 0.5) -> dict:
     if pid == -1:
         return {}
     
@@ -23,20 +23,25 @@ def resource_tracker(pname:str, pid: int, samples: int = 30, interval: int = 0.5
     rss_usage = list()
     
     for _ in range(samples):
-        timestamp.append(time.time())
+        timestamp.append(((time.time() * 100) // 1) / 100)
         cpu_precent.append(round(process.cpu_percent(interval=interval), 2))
         rss_usage.append(round(process.memory_percent(memtype="rss"), 2))
 
+    timestamp = [(((val - timestamp[0]) * 100) // 1) /100 for val in timestamp]
+    no_of_pids = len(psutil.pids())
+
     resource_data = {
         "timestamp": timestamp,
-        "cpu_precent": cpu_precent,
-        "rss_usage": rss_usage
+        "cpu_percent": {no_of_pids: cpu_precent},
+        "rss_usage": {no_of_pids: rss_usage}
     }
     
     return {pname: resource_data}
 
 def main():
-    process_deets: list[str] = {val.strip(): get_pid(val.strip()) for val in input("Enter the process names: ").split(",")}
+    # process_deets: list[str] = {val.strip(): get_pid(val.strip()) for val in input("Enter the process names: ").split(",")}
+    process_names: list[str] = ["python3", "node"]
+    process_deets: dict = {val.strip(): get_pid(val.strip()) for val in process_names}
     resource_data: dict = dict()
 
     with cf.ThreadPoolExecutor(max_workers=5) as executor:
