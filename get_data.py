@@ -6,10 +6,16 @@ import psutil
 import json
 
 def get_pid(name: str) ->int:
-    try:
-        return int(check_output(["pidof",name]).decode("utf-8").split(" ")[-1].strip())
-    except CalledProcessError: 
-        return -1
+    for proc in psutil.process_iter():
+        if name.lower() in proc.name().lower():
+            return proc.pid
+        
+    return -1
+    
+    # try:
+    #     return int(check_output(["pidof",name]).decode("utf-8").split(" ")[-1].strip())
+    # except CalledProcessError: 
+    #     return -1
 
 def resource_tracker(pname:str, pid: int, samples: int = 60, interval: int = 0.5) -> dict:
     if pid == -1:
@@ -19,12 +25,12 @@ def resource_tracker(pname:str, pid: int, samples: int = 60, interval: int = 0.5
     process = psutil.Process(pid)
 
     timestamp = list()
-    cpu_precent = list()
+    cpu_percent = list()
     rss_usage = list()
     
     for _ in range(samples):
         timestamp.append(((time.time() * 100) // 1) / 100)
-        cpu_precent.append(round(process.cpu_percent(interval=interval), 2))
+        cpu_percent.append(round(process.cpu_percent(interval=interval), 2))
         rss_usage.append(round(process.memory_percent(memtype="rss"), 2))
 
     timestamp = [(((val - timestamp[0]) * 100) // 1) /100 for val in timestamp]
@@ -32,7 +38,7 @@ def resource_tracker(pname:str, pid: int, samples: int = 60, interval: int = 0.5
 
     resource_data = {
         "timestamp": timestamp,
-        "cpu_percent": {no_of_pids: cpu_precent},
+        "cpu_percent": {no_of_pids: cpu_percent},
         "rss_usage": {no_of_pids: rss_usage}
     }
     
@@ -43,6 +49,8 @@ def main():
     process_names: list[str] = ["python3", "node"]
     process_deets: dict = {val.strip(): get_pid(val.strip()) for val in process_names}
     resource_data: dict = dict()
+
+    # print(process_deets)
 
     with cf.ThreadPoolExecutor(max_workers=5) as executor:
         futures = [executor.submit(resource_tracker, k, v) for k, v in process_deets.items()]
